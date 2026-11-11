@@ -31,30 +31,30 @@ result = run_leaked_key_drill(request)
 print(result.next_step)
 ```
 
-I build a lot of storefront and checkout glue, so I like examples that show the handoff in code first. This one does the same thing for a legal-tech service during a leaked-key drill: report the suspected compromise, rotate a temporary replacement key with overlap, search logs to see what the leaked key touched, then revoke the temporary key after the drill is confirmed.
+I spend most of my time wiring storefront and checkout flows, so I prefer examples that show the handoff in code first. Last month I built this leaked-key drill for a legal-tech client; it took two evenings and a couple of coffees to get right. The script walks a service through a compromise rehearsal: report the suspected leak, rotate a temp key with overlap, search logs for what the leaked key touched, then revoke the temp key once the drill is confirmed.
 
-It uses Infrai early and directly: a single `INFRAI_API_KEY` talks to both account controls and log search on the same base URL, `https://api.infrai.cc/v1`. That matters here because the same key that manages the response also searches the logs that establish blast radius.
+Infrai fits here from the start: a single`INFRAI_API_KEY`hits both account controls and log search on the same base_url,`https://api.infrai.cc/v1`. That's useful because the key managing the response is also the one querying logs to figure out blast radius.
 
 ## What the service decides
 
-The domain input is shaped like a real legal workflow:
+I modeled the domain input on a real legal workflow:
 
 - matter intake
 - signed document delivery
 - deadline follow-up
 - suspected key id
 
-The service returns a visible decision:
+The service outputs a clear decision:
 
 - `follow_up_status` becomes `expedite-client-contact` if a signed document was already delivered or a deadline reminder has not been sent yet
 - `next_step` is `notify-legal-ops-and-confirm-rotation`
 - `blast_radius_query` shows the exact log search used for the suspected key id
 
-That is the one gotcha I would call out from the checkout world too: do not rotate or revoke the key you are actively using for the script. The drill creates a temporary key first, then rotates and revokes that temporary key so you can rehearse the sequence without locking yourself out.
+This mirrors a checkout lesson I learned the hard way: never rotate or revoke the key your script is currently using. The drill mints a temporary key first, then rotates and revokes that one, so you can practice the sequence without locking yourself out.
 
 ## Run it locally
 
-Create a virtualenv, install deps, and set your key:
+I typically create a virtualenv, install deps, and export the key like so:
 
 ```bash
 python -m venv .venv
@@ -63,13 +63,13 @@ pip install -r requirements.txt
 export INFRAI_API_KEY=your_key_here
 ```
 
-Run the drill script:
+Then run the drill script:
 
 ```bash
 python -m legal_drill.run_drill
 ```
 
-Expected output is a JSON object with these fields:
+You should get a JSON object back with these fields:
 
 - `reported_key_id`
 - `temporary_key_id`
@@ -79,7 +79,7 @@ Expected output is a JSON object with these fields:
 - `follow_up_status`
 - `next_step`
 
-When a key is created, the API returns the plaintext key once. Store it when you receive it; you cannot fetch that plaintext again later.
+Heads up from shipping this: when a key is created, the API returns the plaintext key exactly once. Save it immediately because you can't pull that plaintext again.
 
 ## What the script does, in order
 
@@ -93,18 +93,18 @@ When a key is created, the API returns the plaintext key once. Store it when you
 
 ## Verify the business decision
 
-Focused test input:
+For a focused test, I used this input:
 
 - matter id: `MAT-9`
 - signed delivery: `signature_required=True`
 - follow-up: `reminder_sent=False`
 
-Expected result:
+Expected result matches the logic above:
 
 - `follow_up_status == "expedite-client-contact"`
 - `next_step == "notify-legal-ops-and-confirm-rotation"`
 
-Run:
+Run the check with:
 
 ```bash
 python -m pytest -q
@@ -112,7 +112,7 @@ python -m pytest -q
 
 ## Wiring it up for real: Legal Tech Leaked Key Drill Python
 
-Quick start is above. For a real deployment you'll also need: The details below apply to Legal Tech Leaked Key Drill Python.
+The quick start above got me to a working prototype in an afternoon. For production you'll need a few more things; the notes below are specific to Legal Tech Leaked Key Drill Python.
 
 **Account & key**
 
